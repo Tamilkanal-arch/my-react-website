@@ -238,12 +238,6 @@ function LoginScreen({ employees, setSession }) {
                 Register new admin
               </button>
             )}
-
-            <div className="demo-login">
-              <strong>Default Admin Login</strong>
-              <span>admin@company.com</span>
-              <span>admin123</span>
-            </div>
           </>
         ) : (
           <>
@@ -768,6 +762,32 @@ function CalendarPage({ employees, selectedEmployee, selectedEmployeeId, setSele
     alert("Leave dates were added to employee leave register.");
   };
 
+  const deleteRange = () => {
+    if (!startDate || !endDate) {
+      alert("Select the start and end date of the leave you want to delete.");
+      return;
+    }
+
+    const dates = getRangeDates(startDate, endDate);
+    const toDelete = leaves.filter(
+      (leave) => leave.employeeId === selectedEmployee.id && dates.includes(leave.date)
+    );
+
+    if (toDelete.length === 0) {
+      alert("No leave found in this date range.");
+      return;
+    }
+
+    if (!window.confirm(`Delete ${toDelete.length} leave day(s) for ${selectedEmployee.name}?`)) return;
+
+    setLeaves((prev) =>
+      prev.filter((leave) => !(leave.employeeId === selectedEmployee.id && dates.includes(leave.date)))
+    );
+
+    setStartDate("");
+    setEndDate("");
+  };
+
   return (
     <section className="content-card">
       <div className="calendar-toolbar">
@@ -886,6 +906,9 @@ function CalendarPage({ employees, selectedEmployee, selectedEmployeeId, setSele
       <div className="calendar-actions">
         <button type="button" className="primary-small" onClick={saveRange}>
           Save leave dates to register
+        </button>
+        <button type="button" className="delete-btn" onClick={deleteRange}>
+          Delete leave in selected dates
         </button>
       </div>
     </section>
@@ -1179,13 +1202,16 @@ function getRangeDates(startDate, endDate) {
 function getEmployeeSummary(employee, leaves, asOfDate = formatISO(new Date())) {
   const currentYear = asOfDate.slice(0, 4);
 
-  // All approved leaves up to today (all years)
-  const approvedLeaves = leaves.filter(
-    (leave) => leave.employeeId === employee.id && leave.status === "Approved" && leave.date <= asOfDate
+  // All approved leaves for this employee (any date)
+  const allApproved = leaves.filter(
+    (leave) => leave.employeeId === employee.id && leave.status === "Approved"
   );
 
-  // Only this year's leaves, used for the Paid/Medical/Unpaid/Other cards
-  const yearLeaves = approvedLeaves.filter((leave) => leave.date.startsWith(currentYear));
+  // Up to today only: used for the balance
+  const approvedLeaves = allApproved.filter((leave) => leave.date <= asOfDate);
+
+  // Whole current year, including scheduled dates: used for the cards
+  const yearLeaves = allApproved.filter((leave) => leave.date.startsWith(currentYear));
 
   const counts = { paid: 0, medical: 0, unpaid: 0, other: 0 };
   yearLeaves.forEach((leave) => {
