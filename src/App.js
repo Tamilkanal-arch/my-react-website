@@ -1,3 +1,4 @@
+/* eslint-disable no-control-regex */
 import React, { useEffect, useState } from "react";
 import "./App.css";
 
@@ -425,7 +426,7 @@ function Dashboard({ employees, leaves, selectedEmployeeId, setSelectedEmployeeI
               <div>
                 <span>Balance vs Taken</span>
                 <strong>{summary.balance} days balance</strong>
-                <small>{summary.taken} days taken from {summary.accrued} accrued</small>
+                <small>{summary.taken} paid days taken from {summary.accrued} accrued</small>
               </div>
               <div
                 className="balance-donut"
@@ -1176,29 +1177,37 @@ function getRangeDates(startDate, endDate) {
 }
 
 function getEmployeeSummary(employee, leaves, asOfDate = formatISO(new Date())) {
-  const employeeLeaves = leaves.filter(
+  const currentYear = asOfDate.slice(0, 4);
+
+  // All approved leaves up to today (all years)
+  const approvedLeaves = leaves.filter(
     (leave) => leave.employeeId === employee.id && leave.status === "Approved" && leave.date <= asOfDate
   );
-  const counts = { paid: 0, medical: 0, unpaid: 0, other: 0 };
 
-  employeeLeaves.forEach((leave) => {
+  // Only this year's leaves, used for the Paid/Medical/Unpaid/Other cards
+  const yearLeaves = approvedLeaves.filter((leave) => leave.date.startsWith(currentYear));
+
+  const counts = { paid: 0, medical: 0, unpaid: 0, other: 0 };
+  yearLeaves.forEach((leave) => {
     const key = leave.type.toLowerCase();
     if (counts[key] !== undefined) {
       counts[key] += 1;
     }
   });
 
+  // Only PAID leave is deducted from the accrued balance (all years, carried forward)
+  const paidTaken = approvedLeaves.filter((leave) => leave.type === "Paid").length;
+
   const entitlement = Number(employee.entitlement || 0);
   const accrued = calculateAccruedLeave(employee.joiningDate, asOfDate, entitlement);
-  const taken = employeeLeaves.length;
-  const balance = Math.max(0, accrued - taken);
+  const balance = Math.max(0, accrued - paidTaken);
 
   return {
     paid: counts.paid,
     medical: counts.medical,
     unpaid: counts.unpaid,
     other: counts.other,
-    taken,
+    taken: paidTaken,
     accrued: Number(accrued.toFixed(1)),
     balance: Number(balance.toFixed(1))
   };
@@ -1343,7 +1352,7 @@ function escapeXml(value) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-       // eslint-disable-next-line no-control-regex
+    // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "");
 }
 
